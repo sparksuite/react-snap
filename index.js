@@ -26,7 +26,7 @@ const defaultOptions = {
   puppeteer: {
     cache: true
   },
-  puppeteerArgs: [],
+  puppeteerArgs: ["--no-sandbox", "--disable-setuid-sandbox"],
   puppeteerExecutablePath: undefined,
   puppeteerIgnoreHTTPSErrors: false,
   publicPath: "/",
@@ -50,7 +50,7 @@ const defaultOptions = {
   fixWebpackChunksIssue: "CRA1",
   removeBlobs: true,
   fixInsertRule: true,
-  skipThirdPartyRequests: false,
+  skipThirdPartyRequests: true,
   cacheAjaxRequests: false,
   http2PushManifest: false,
   // may use some glob solution in the future, if required
@@ -514,8 +514,9 @@ const fixParcelChunksIssue = ({
 }) => {
   return page.evaluate(
     (basePath, http2PushManifest, inlineCss) => {
-      const localScripts = Array.from(document.scripts)
-        .filter(x => x.src && x.src.startsWith(basePath))
+      const localScripts = Array.from(document.scripts).filter(
+        x => x.src && x.src.startsWith(basePath)
+      );
 
       const mainRegexp = /main\.[\w]{8}\.js/;
       const mainScript = localScripts.find(x => mainRegexp.test(x.src));
@@ -840,7 +841,7 @@ const run = async (userOptions, { fs } = { fs: nativeFs }) => {
         );
         routePath = normalizePath(routePath);
         if (routePath !== newPath) {
-          console.log(newPath)
+          console.log(newPath);
           console.log(`💬  in browser redirect (${newPath})`);
           addToQueue(newRoute);
         }

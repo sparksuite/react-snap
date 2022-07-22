@@ -1,11 +1,11 @@
 {
-  "name": "react-snap",
-  "version": "1.23.0",
+  "name": "@sparksuite/react-snap",
+  "version": "1.0.0",
   "description": "Zero-configuration framework-agnostic static prerendering for SPAs",
   "main": "index.js",
   "author": "stereobooster",
   "license": "MIT",
-  "repository": "stereobooster/react-snap",
+  "repository": "sparksuite/react-snap",
   "engines": {
     "node": ">= 8.6.0"
   },
@@ -19,7 +19,8 @@
     "mkdirp": "0.5.1",
     "puppeteer": "^1.8.0",
     "serve-static": "1.14.1",
-    "sourcemapped-stacktrace-node": "2.1.8"
+    "sourcemapped-stacktrace-node": "2.1.8",
+    "yargs": "^17.5.1"
   },
   "devDependencies": {
     "dev-null-stream": "0.0.1",
@@ -30,7 +31,7 @@
   "scripts": {
     "toc": "yarn run markdown-toc -i doc/recipes.md",
     "test": "jest",
-    "precommit": "prettier --write {*,src/*}.{js,json,css}"
+    "format": "prettier --write {*,src/*}.{js,json,css}"
   },
   "bin": {
     "react-snap": "./run.js"

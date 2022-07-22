@@ -8,12 +8,15 @@ const {
   devDependencies,
   dependencies
 } = require(`${process.cwd()}/package.json`);
+const yargs = require("yargs/yargs");
+const { hideBin } = require("yargs/helpers");
+const argv = yargs(hideBin(process.argv)).argv;
 
 const publicUrl = process.env.PUBLIC_URL || homepage;
 
 const reactScriptsVersion = parseInt(
-  (devDependencies && devDependencies["react-scripts"])
-  || (dependencies && dependencies["react-scripts"])
+  (devDependencies && devDependencies["react-scripts"]) ||
+    (dependencies && dependencies["react-scripts"])
 );
 let fixWebpackChunksIssue;
 switch (reactScriptsVersion) {
@@ -26,13 +29,13 @@ switch (reactScriptsVersion) {
 }
 
 const parcel = Boolean(
-  (devDependencies && devDependencies["parcel-bundler"])
-  || (dependencies && dependencies["parcel-bundler"])
+  (devDependencies && devDependencies["parcel-bundler"]) ||
+    (dependencies && dependencies["parcel-bundler"])
 );
 
 if (parcel) {
   if (fixWebpackChunksIssue) {
-    console.log("Detected both Parcel and CRA. Fixing chunk names for CRA!")
+    console.log("Detected both Parcel and CRA. Fixing chunk names for CRA!");
   } else {
     fixWebpackChunksIssue = "Parcel";
   }
@@ -41,6 +44,7 @@ if (parcel) {
 run({
   publicPath: publicUrl ? url.parse(publicUrl).pathname : "/",
   fixWebpackChunksIssue,
+  puppeteerExecutablePath: argv.puppeteerExecutablePath,
   ...reactSnap
 }).catch(error => {
   console.error(error);
