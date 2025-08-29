@@ -15,9 +15,9 @@ const createTracker = page => {
   return {
     urls: () => Array.from(requests).map(r => r.url()),
     dispose: () => {
-      page.removeListener("request", onStarted);
-      page.removeListener("requestfinished", onFinished);
-      page.removeListener("requestfailed", onFinished);
+      page.off("request", onStarted);
+      page.off("requestfinished", onFinished);
+      page.off("requestfailed", onFinished);
     }
   };
 };
