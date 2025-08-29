@@ -226,7 +226,7 @@ const crawl = async opt => {
 
     if (!shuttingDown && !skipExistingFile) {
       try {
-        const page = await browser.newPage();
+        const page = await Promise.race([browser.newPage(), browser.newPage()]);
         const client = await page.createCDPSession();
         await client.send("ServiceWorker.disable");
         await page.setCacheEnabled(options.puppeteer.cache);
