@@ -5,7 +5,10 @@
   "main": "index.js",
   "author": "stereobooster",
   "license": "MIT",
-  "repository": "sparksuite/react-snap",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sparksuite/react-snap.git"
+  },
   "engines": {
     "node": ">= 8.6.0"
   },
@@ -32,7 +35,7 @@
     "format": "prettier --write {*,src/*}.{js,json,css}"
   },
   "bin": {
-    "react-snap": "./run.js"
+    "react-snap": "run.js"
   },
   "files": [
     "index.js",
