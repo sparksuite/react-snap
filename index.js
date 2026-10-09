@@ -8,9 +8,6 @@ const nativeFs = require("fs");
 const mkdirp = require("mkdirp");
 const minify = require("html-minifier").minify;
 const url = require("url");
-const minimalcss = require("minimalcss");
-const CleanCSS = require("clean-css");
-const twentyKb = 20 * 1024;
 
 const defaultOptions = {
   //# stable configurations
@@ -58,9 +55,6 @@ const defaultOptions = {
   ignoreForPreload: ["service-worker.js"],
   //# unstable configurations
   preconnectThirdParty: true,
-  // Experimental. This config stands for two strategies inline and critical.
-  // TODO: inline strategy can contain errors, like, confuse relative urls
-  inlineCss: false,
   //# feature creeps to generate screenshots
   saveAs: "html",
   crawl: true,
@@ -236,11 +230,6 @@ const removeScriptTags = ({ page }) =>
     });
   });
 
-const preloadPolyfill = nativeFs.readFileSync(
-  `${__dirname}/vendor/preload_polyfill.min.js`,
-  "utf8"
-);
-
 /**
  *
  * @param {{page: Page}} opt
@@ -260,113 +249,6 @@ const removeBlobs = async opt => {
   });
 };
 
-/**
- * @param {{page: Page, pageUrl: string, options: {skipThirdPartyRequests: boolean, userAgent: string}, basePath: string, browser: Browser}} opt
- * @return {Promise}
- */
-const inlineCss = async opt => {
-  const { page, pageUrl, options, basePath, browser } = opt;
-
-  const minimalcssResult = await minimalcss.minimize({
-    urls: [pageUrl],
-    skippable: request =>
-      options.skipThirdPartyRequests && !request.url().startsWith(basePath),
-    browser: browser,
-    userAgent: options.userAgent
-  });
-  const criticalCss = minimalcssResult.finalCss;
-  const criticalCssSize = Buffer.byteLength(criticalCss, "utf8");
-
-  const result = await page.evaluate(async () => {
-    const stylesheets = Array.from(
-      document.querySelectorAll("link[rel=stylesheet]")
-    );
-    const cssArray = await Promise.all(
-      stylesheets.map(async link => {
-        const response = await fetch(link.href);
-        return response.text();
-      })
-    );
-    return {
-      cssFiles: stylesheets.map(link => link.href),
-      allCss: cssArray.join("")
-    };
-  });
-  const allCss = new CleanCSS(options.minifyCss).minify(result.allCss).styles;
-  const allCssSize = Buffer.byteLength(allCss, "utf8");
-
-  let cssStrategy, cssSize;
-  if (criticalCssSize * 2 >= allCssSize) {
-    cssStrategy = "inline";
-    cssSize = allCssSize;
-  } else {
-    cssStrategy = "critical";
-    cssSize = criticalCssSize;
-  }
-
-  if (cssSize > twentyKb)
-    console.log(
-      `⚠️  warning: inlining CSS more than 20kb (${cssSize /
-        1024}kb, ${cssStrategy})`
-    );
-
-  if (cssStrategy === "critical") {
-    await page.evaluate(
-      (criticalCss, preloadPolyfill) => {
-        const head = document.head || document.getElementsByTagName("head")[0],
-          style = document.createElement("style");
-        style.type = "text/css";
-        style.appendChild(document.createTextNode(criticalCss));
-        head.appendChild(style);
-        const noscriptTag = document.createElement("noscript");
-        document.head.appendChild(noscriptTag);
-
-        const stylesheets = Array.from(
-          document.querySelectorAll("link[rel=stylesheet]")
-        );
-        stylesheets.forEach(link => {
-          noscriptTag.appendChild(link.cloneNode(false));
-          link.setAttribute("rel", "preload");
-          link.setAttribute("as", "style");
-          link.setAttribute("react-snap-onload", "this.rel='stylesheet'");
-          document.head.appendChild(link);
-        });
-
-        const scriptTag = document.createElement("script");
-        scriptTag.type = "text/javascript";
-        scriptTag.text = preloadPolyfill;
-        // scriptTag.id = "preloadPolyfill";
-        document.body.appendChild(scriptTag);
-      },
-      criticalCss,
-      preloadPolyfill
-    );
-  } else {
-    await page.evaluate(allCss => {
-      if (!allCss) return;
-
-      const head = document.head || document.getElementsByTagName("head")[0],
-        style = document.createElement("style");
-      style.type = "text/css";
-      style.appendChild(document.createTextNode(allCss));
-
-      if (!head) throw new Error("No <head> element found in document");
-
-      head.appendChild(style);
-
-      const stylesheets = Array.from(
-        document.querySelectorAll("link[rel=stylesheet]")
-      );
-      stylesheets.forEach(link => {
-        link.parentNode && link.parentNode.removeChild(link);
-      });
-    }, allCss);
-  }
-  return {
-    cssFiles: cssStrategy === "inline" ? result.cssFiles : []
-  };
-};
-
 const asyncScriptTags = ({ page }) => {
   return page.evaluate(() => {
     Array.from(document.querySelectorAll("script[src]")).forEach(x => {
@@ -375,21 +257,15 @@ const asyncScriptTags = ({ page }) => {
   });
 };
 
-const fixWebpackChunksIssue1 = ({
-  page,
-  basePath,
-  http2PushManifest,
-  inlineCss
-}) => {
+const fixWebpackChunksIssue1 = ({ page, basePath, http2PushManifest }) => {
   return page.evaluate(
-    (basePath, http2PushManifest, inlineCss) => {
+    (basePath, http2PushManifest) => {
       const localScripts = Array.from(document.scripts).filter(
         x => x.src && x.src.startsWith(basePath)
       );
       // CRA v1|v2.alpha
       const mainRegexp = /main\.[\w]{8}.js|main\.[\w]{8}\.chunk\.js/;
       const mainScript = localScripts.find(x => mainRegexp.test(x.src));
-      const firstStyle = document.querySelector("style");
 
       if (!mainScript) return;
 
@@ -414,11 +290,7 @@ const fixWebpackChunksIssue1 = ({
         linkTag.setAttribute("rel", "preload");
         linkTag.setAttribute("as", "script");
         linkTag.setAttribute("href", x.src.replace(basePath, ""));
-        if (inlineCss) {
-          firstStyle.parentNode.insertBefore(linkTag, firstStyle);
-        } else {
-          document.head.appendChild(linkTag);
-        }
+        document.head.appendChild(linkTag);
       };
 
       mainScripts.map(x => createLink(x));
@@ -431,26 +303,19 @@ const fixWebpackChunksIssue1 = ({
       }
     },
     basePath,
-    http2PushManifest,
-    inlineCss
+    http2PushManifest
   );
 };
 
-const fixWebpackChunksIssue2 = ({
-  page,
-  basePath,
-  http2PushManifest,
-  inlineCss
-}) => {
+const fixWebpackChunksIssue2 = ({ page, basePath, http2PushManifest }) => {
   return page.evaluate(
-    (basePath, http2PushManifest, inlineCss) => {
+    (basePath, http2PushManifest) => {
       const localScripts = Array.from(document.scripts).filter(
         x => x.src && x.src.startsWith(basePath)
       );
       // CRA v2
       const mainRegexp = /main\.[\w]{8}\.chunk\.js/;
       const mainScript = localScripts.find(x => mainRegexp.test(x.src));
-      const firstStyle = document.querySelector("style");
 
       if (!mainScript) return;
 
@@ -478,11 +343,7 @@ const fixWebpackChunksIssue2 = ({
         linkTag.setAttribute("rel", "preload");
         linkTag.setAttribute("as", "script");
         linkTag.setAttribute("href", x.src.replace(basePath, ""));
-        if (inlineCss) {
-          firstStyle.parentNode.insertBefore(linkTag, firstStyle);
-        } else {
-          document.head.appendChild(linkTag);
-        }
+        document.head.appendChild(linkTag);
       };
 
       for (let i = headScripts.length; i <= chunkScripts.length - 1; i++) {
@@ -501,26 +362,19 @@ const fixWebpackChunksIssue2 = ({
       }
     },
     basePath,
-    http2PushManifest,
-    inlineCss
+    http2PushManifest
   );
 };
 
-const fixParcelChunksIssue = ({
-  page,
-  basePath,
-  http2PushManifest,
-  inlineCss
-}) => {
+const fixParcelChunksIssue = ({ page, basePath, http2PushManifest }) => {
   return page.evaluate(
-    (basePath, http2PushManifest, inlineCss) => {
+    (basePath, http2PushManifest) => {
       const localScripts = Array.from(document.scripts).filter(
         x => x.src && x.src.startsWith(basePath)
       );
 
       const mainRegexp = /main\.[\w]{8}\.js/;
       const mainScript = localScripts.find(x => mainRegexp.test(x.src));
-      const firstStyle = document.querySelector("style");
 
       if (!mainScript) return;
 
@@ -538,11 +392,7 @@ const fixParcelChunksIssue = ({
         linkTag.setAttribute("rel", "preload");
         linkTag.setAttribute("as", "script");
         linkTag.setAttribute("href", x.src.replace(`${basePath}/`, ""));
-        if (inlineCss) {
-          firstStyle.parentNode.insertBefore(linkTag, firstStyle);
-        } else {
-          document.head.appendChild(linkTag);
-        }
+        document.head.appendChild(linkTag);
       };
 
       for (let i = 0; i <= chunkScripts.length - 1; i++) {
@@ -554,8 +404,7 @@ const fixParcelChunksIssue = ({
       }
     },
     basePath,
-    http2PushManifest,
-    inlineCss
+    http2PushManifest
   );
 };
 
@@ -600,8 +449,7 @@ const fixFormFields = ({ page }) => {
 };
 
 const saveAsHtml = async ({ page, filePath, options, route, fs }) => {
-  let content = await page.content();
-  content = content.replace(/react-snap-onload/g, "onload");
+  const content = await page.content();
   const title = await page.title();
   const minifiedContent = options.minifyHtml
     ? minify(content, options.minifyHtml)
@@ -729,56 +577,28 @@ const run = async (userOptions, { fs } = { fs: nativeFs }) => {
         http2PushManifestItems[route] = hpm;
       }
     },
-    afterFetch: async ({ page, route, browser, addToQueue }) => {
-      const pageUrl = `${basePath}${route}`;
+    afterFetch: async ({ page, route, addToQueue }) => {
       if (options.removeStyleTags) await removeStyleTags({ page });
       if (options.removeScriptTags) await removeScriptTags({ page });
       if (options.removeBlobs) await removeBlobs({ page });
-      if (options.inlineCss) {
-        const { cssFiles } = await inlineCss({
-          page,
-          pageUrl,
-          options,
-          basePath,
-          browser
-        });
-
-        if (http2PushManifest) {
-          const filesToRemove = cssFiles
-            .filter(file => file.startsWith(basePath))
-            .map(file => file.replace(basePath, ""));
-
-          for (let i = http2PushManifestItems[route].length - 1; i >= 0; i--) {
-            const x = http2PushManifestItems[route][i];
-            filesToRemove.forEach(fileToRemove => {
-              if (x.link.startsWith(fileToRemove)) {
-                http2PushManifestItems[route].splice(i, 1);
-              }
-            });
-          }
-        }
-      }
 
       if (options.fixWebpackChunksIssue === "Parcel") {
         await fixParcelChunksIssue({
           page,
           basePath,
-          http2PushManifest,
-          inlineCss: options.inlineCss
+          http2PushManifest
         });
       } else if (options.fixWebpackChunksIssue === "CRA2") {
         await fixWebpackChunksIssue2({
           page,
           basePath,
-          http2PushManifest,
-          inlineCss: options.inlineCss
+          http2PushManifest
         });
       } else if (options.fixWebpackChunksIssue === "CRA1") {
         await fixWebpackChunksIssue1({
           page,
           basePath,
-          http2PushManifest,
-          inlineCss: options.inlineCss
+          http2PushManifest
         });
       }
       if (options.asyncScriptTags) await asyncScriptTags({ page });

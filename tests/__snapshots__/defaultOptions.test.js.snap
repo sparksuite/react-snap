@@ -18,7 +18,6 @@ Object {
   "include": Array [
     "/",
   ],
-  "inlineCss": false,
   "minifyCss": Object {},
   "minifyHtml": Object {
     "collapseBooleanAttributes": true,

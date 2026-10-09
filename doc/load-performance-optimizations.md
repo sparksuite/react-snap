@@ -22,10 +22,6 @@
 
 This is a brief overview of what described in Readme and [recipes](recipes.md).
 
-### inlineCss
-
-With this configuration enabled `react-snap` will inline critical CSS and stylesheet links will be loaded in a nonblocking manner with the help of [loadCss](https://www.npmjs.com/package/fg-loadcss).
-
 ### cacheAjaxRequests
 
 If you are doing AJAX requests (to the same domain), `react-snap` can cache this data in the window. Think of it as a poor man's Redux rehydration.

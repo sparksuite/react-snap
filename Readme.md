@@ -121,21 +121,11 @@ If you need to pass some options for `react-snap`, you can do this in your `pack
 
 ```json
 "reactSnap": {
-  "inlineCss": true
+  "source": "dist"
 }
 ```
 
 Not all options are documented yet, but you can check `defaultOptions` in `index.js`.
-
-### inlineCss
-
-Experimental feature - requires improvements.
-
-`react-snap` can inline critical CSS with the help of [minimalcss](https://github.com/peterbe/minimalcss) and full CSS will be loaded in a non-blocking manner with the help of [loadCss](https://www.npmjs.com/package/fg-loadcss).
-
-Use `inlineCss: true` to enable this feature.
-
-TODO: as soon as this feature is stable, it should be enabled by default.
 
 ## ⚠️ Caveats
 
@@ -289,8 +279,6 @@ you may use:
 
 Read more about [puppeteer troubleshooting](https://github.com/GoogleChrome/puppeteer/blob/master/docs/troubleshooting.md).
 
-`"inlineCss": true` sometimes causes problems in containers.
-
 #### Docker + Alpine
 
 To run `react-snap` inside `docker` with Alpine, you might want to use a custom Chromium executable. See [#93](https://github.com/stereobooster/react-snap/issues/93#issuecomment-354994505) and [#132](https://github.com/stereobooster/react-snap/issues/132#issuecomment-362333702).
@@ -361,7 +349,3 @@ Please provide a reproducible demo of a bug and steps to reproduce it. Thanks!
 ### Share on the web
 
 Tweet it, like it, share it, star it. Thank you.
-
-### Code
-
-You can also contribute to [minimalcss](https://github.com/peterbe/minimalcss), which is a big part of `react-snap`. Also, give it some stars.
